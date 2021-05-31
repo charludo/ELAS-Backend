@@ -130,4 +130,5 @@ dmypy.json
 
 # Custom
 .idea/
-.flaskenv
+*.flaskenv
+*.env
