@@ -14,30 +14,23 @@ def run(config, insight_url, e3_url):
 
     os.chdir(config["courseScraper"])
     subprocess.call(f"scrapy crawl course-catalog -a url='{insight_url}' -o {temp_catalog}")
-    subprocess.call(f"scrapy crawl course-catalog -a url='{e3_url}' -o {temp_e3}")
+    subprocess.call(f"scrapy crawl course-catalog -a url='{e3_url}' -a e3=True -o {temp_e3}")
 
     os.chdir(config["ratingsScraper"])
     subprocess.call(f"scrapy crawl -a email=\"{config['ratingsEmail']}\" -a password=\"{config['ratingsPassword']}\" course-ratings -o {temp_ratings}")
 
-    # 2. load the data from the temp files
-    with open(temp_catalog) as file:
-        insight_courses_raw = json.load(file)
+    # 2. post-process and save the insight data
+    os.chdir(os.path.join(config["courseScraper"], "course_catalog", "post_processing"))
+    subprocess.call(f"python process_data.py {temp_catalog} {config['courseInsightsTargetFile']}")
 
+    # 3. load the data from the temp files
     with open(temp_e3) as file:
-        e3_courses_raw = json.load(file)
+        e3_courses = json.load(file)
 
     with open(temp_ratings) as file:
         ratings = json.load(file)
 
-    # 3. flatten the courses-files
-    insight_courses = flatten(insight_courses_raw)
-    e3_courses = flatten(e3_courses_raw)
-
-    # 4. write courseInsights data to target file
-    with open(config["courseInsightsTargetFile"], "w") as file:
-        file.write(json.dump(insight_courses))
-
-    # 5. process e3 data & ratings, write to target files
+    # 4. process e3 data & ratings, write to target files
     e3_processed, avg_ratings = process_e3(e3_courses, ratings)
 
     with open(config["e3TargetFile"], "w") as file:
@@ -46,25 +39,10 @@ def run(config, insight_url, e3_url):
     with open(config["e3RatingsFile"], "w") as file:
         file.write(json.dump(avg_ratings))
 
-    # 6. update statusMessage in config
+    # 5. update statusMessage in config
     config["statusMessage"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     with open(os.path.join(os.path.dirname(__file__), "config.yaml"), "w") as file:
         file.write(yaml.dump(config))
-
-
-def flatten(unflat):
-    if isinstance(unflat, list):
-        for uf in unflat:
-            yield from flatten(uf)
-        return
-
-    if "subjects" in unflat:
-        for subject in unflat["subjects"]:
-            yield subject
-
-    if "categories" in unflat:
-        for category in unflat["categories"]:
-            yield from flatten(category)
 
 
 def process_e3(courses, ratings):
@@ -86,19 +64,19 @@ def process_e3(courses, ratings):
         # Rename the dict keys
         processed_course = {
             "selected": False,
-            "Title": course["Title"],
-            "catalog": course["catalog"],
-            "Type": course["Type"],
-            "SWS": course["SWS"],
-            "Erwartete Teilnehmer": course["Erwartete Teilnehmer"],
-            "Max. Teilnehmer": course["Max. Teilnehmer"],
-            "Credits": course["Credits"],
-            "Language": course["Language"],
-            "Times_manual": course["times"],
-            "Location": course["Location"],
-            "Ausgeschlossen_manual": course["ausgeschlossen"],
-            "Exam": course["Exam"],
-            "Link": course["Link"]
+            "Title": course["name"],
+            "Link": course["url"],
+            "catalog": course["parent_id"],
+            "Type": course["subject_type"],
+            "SWS": course["sws"],
+            "Erwartete Teilnehmer": course["expected"],
+            "Max. Teilnehmer": course["max"],
+            "Credits": course["credits"],
+            "Language": course["language"],
+            "Times_manual": convert_timetable(course["timetable"]),
+            "Location": get_locations(course["timetable"]),
+            "Exam": course["exam"],
+            "Ausgeschlossen_manual": course["excluded"],
         }
 
         # integrate the ratings, if they exist
@@ -135,3 +113,33 @@ def find_ratings(ratings, title):
                 "grade_effort": rating["node_effort"] / 100
             }
     return None
+
+
+def convert_timetable(timetable):
+    flattime = ""
+    for dates in timetable:
+        flattime += dates["day"][:-1] + dates["time"]["from"][:-3] + "-" + dates["time"]["to"][:-3] + ";"
+    return flattime
+
+
+def get_locations(timetable):
+    locations = set()
+
+    for date in timetable:
+        loc = date["comment"]
+
+        if "Dortmund" in loc:
+            locations.add("Dortmund")
+        elif "online" in loc:
+            locations.add("online")
+        elif any("Ruhr", "Bochum", "HNC", "RUB") in loc:
+            locations.add("Bochum")
+        elif "Essen" in loc or loc.startswith("E ") or loc.split(": ")[1].startswith("E "):
+            locations.add("Essen")
+        elif "Duisburg" in loc or loc.startswith("D ") or loc.split(": ")[1].startswith("D "):
+            locations.add("Duisburg")
+
+    if not len(locations):
+        return "unknown"
+    else:
+        return ";".join(locations)
