@@ -1,0 +1,8 @@
+courseInsightsTargetFile: /test/data.json
+courseScraper: module.test
+e3RatingsFile: /test/ratings.json
+e3TargetFile: /test/data.json
+ratingsEmail: test
+ratingsPassword: test
+ratingsScraper: module.test
+statusMessage: 2021-07-12 14:13
