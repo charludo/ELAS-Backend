@@ -143,3 +143,37 @@ def get_locations(timetable):
         return "unknown"
     else:
         return ";".join(locations)
+
+
+def get_exams(text):
+    markers = {
+        "Präsentation": [
+            "referat", "präsentation", "presentation"
+        ],
+        "Mündliche Prüfung": [
+            "mündlich", "oral", "prüfung"
+        ],
+        "Klausur": [
+            "schriftlich", "klausur", "exam", "e-klausur", "präsenz", "written"
+        ],
+        "Essay": [
+            "seitig", "page", "besprechung", "essay", "hausarbeit", "ausarbeitung", "seiten", "hausaufgabe", "dokumentation", "documentation", "protokoll",
+            "zeichen", "character", "tagebuch", "diary", "assignment"
+        ]
+    }
+
+    weight = {
+        "Präsentation": 0,
+        "Mündliche Prüfung": 0,
+        "Klausur": 0,
+        "Essay": 0
+    }
+
+    for key, item in markers.iter():
+        for marker in item:
+            weight[key] += text.count(marker)
+
+    if sum(weight.values()) == 0:
+        return "unknown"
+
+    return max(weight, key=lambda k: weight[k])
