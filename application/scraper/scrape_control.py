@@ -40,7 +40,12 @@ def run(config, insight_url, e3_url):
     with open(config["e3RatingsFile"], "w") as file:
         file.write(json.dump(avg_ratings))
 
-    # 5. update statusMessage in config
+    # 5. remove temp files
+    os.remove(temp_catalog)
+    os.remove(temp_e3)
+    os.remove(temp_ratings)
+
+    # 6. update statusMessage in config
     config["statusMessage"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     with open(os.path.join(os.path.dirname(__file__), "config.yaml"), "w") as file:
         file.write(yaml.dump(config))
@@ -74,6 +79,7 @@ def process_e3(courses, ratings):
             "Max. Teilnehmer": course["max"],
             "Credits": course["credits"],
             "Language": course["language"],
+            "Description": clean_description(course["description"]),
             "Times_manual": convert_timetable(course["timetable"]),
             "Location": get_locations(course["timetable"]),
             "Exam": get_exams(course["exam"]),
@@ -114,6 +120,11 @@ def find_ratings(ratings, title):
                 "grade_effort": rating["node_effort"] / 100
             }
     return None
+
+
+def clean_description(text):
+    text = re.sub(r"Inhalte:[\s\\r\\n]+", "", text)
+    return text
 
 
 def convert_timetable(timetable):
@@ -159,7 +170,7 @@ def get_exams(text):
         ],
         "Essay": [
             "seitig", "page", "besprechung", "essay", "hausarbeit", "ausarbeitung", "seiten", "hausaufgabe", "dokumentation", "documentation", "protokoll",
-            "zeichen", "character", "tagebuch", "diary", "assignment"
+            "zeichen", "character", "tagebuch", "diary", "assignment", "portfolio"
         ]
     }
 
