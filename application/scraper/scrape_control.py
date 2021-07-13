@@ -204,12 +204,20 @@ def get_excluded(text):
         "NanoEng": "Nano Engineering",
         "Wi-Ing": "Wirtschaftsingenieurwesen",
         "Angewandte Informatik": "Angewandte Informatik",
-        "IngWi": "ALLE",
+        "Ang. Inf.": "Angewandte Informatik"
+    }
+
+    overrides = {
+        " IngWi": "ALLE",
         "Alle außer BauIng (1. FS)": "ALLE (außer Bauingenieurwesen (1. FS))",
         "IngWi (außer BauIng)": "ALLE (außer Bauingenieurwesen)"
     }
 
     text = re.sub(r"[^0-9a-zA-Z,.-]+", " ", text)
+
+    for key, item in overrides.iter():
+        if key in text:
+            return item
 
     excluded = []
 
