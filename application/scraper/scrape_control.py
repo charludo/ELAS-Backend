@@ -54,6 +54,7 @@ def run(config, insight_url, e3_url):
     os.remove(temp_catalog)
     os.remove(temp_e3)
     os.remove(temp_ratings)
+    os.remove(temp_ratings_raw)
 
     # 6. update statusMessage in config
     config["statusMessage"] = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -77,6 +78,10 @@ def process_e3(courses, ratings):
     ratings_count = 0
 
     for course in courses:
+        # check for duplicates
+        if course["url"] in [c["Link"] for c in processed_courses]:
+            continue
+
         # Rename the dict keys
         processed_course = {
             "selected": False,
