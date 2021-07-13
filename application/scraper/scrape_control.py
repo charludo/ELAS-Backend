@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 import json
 import subprocess
@@ -75,8 +76,8 @@ def process_e3(courses, ratings):
             "Language": course["language"],
             "Times_manual": convert_timetable(course["timetable"]),
             "Location": get_locations(course["timetable"]),
-            "Exam": course["exam"],
-            "Ausgeschlossen_manual": course["excluded"],
+            "Exam": get_exams(course["exam"]),
+            "Ausgeschlossen_Ingenieurwissenschaften_Bachelor": get_excluded(course["excluded"])
         }
 
         # integrate the ratings, if they exist
@@ -169,6 +170,8 @@ def get_exams(text):
         "Essay": 0
     }
 
+    text = text.lower()
+
     for key, item in markers.iter():
         for marker in item:
             weight[key] += text.count(marker)
@@ -177,3 +180,30 @@ def get_exams(text):
         return "unknown"
 
     return max(weight, key=lambda k: weight[k])
+
+
+def get_excluded(text):
+    shorthand = {
+        "BauIng": "Bauingenieurwesen",
+        "Komedia": "Komedia",
+        "ISE": "ISE",
+        "Maschinenbau": "Maschinenbau",
+        "EIT": "Elektrotechnik und Informationstechnik",
+        "Medizintechnik": "Medizintechnik",
+        "NanoEng": "Nano Engineering",
+        "Wi-Ing": "Wirtschaftsingenieurwesen",
+        "Angewandte Informatik": "Angewandte Informatik",
+        "IngWi": "ALLE",
+        "Alle außer BauIng (1. FS)": "ALLE (außer Bauingenieurwesen (1. FS))",
+        "IngWi (außer BauIng)": "ALLE (außer Bauingenieurwesen)"
+    }
+
+    text = re.sub(r"[^0-9a-zA-Z,.-]+", " ", text)
+
+    excluded = []
+
+    for key, item in shorthand.iter():
+        if key in text:
+            excluded.append(item)
+
+    return ";".join(excluded) if len(excluded) else "-"
