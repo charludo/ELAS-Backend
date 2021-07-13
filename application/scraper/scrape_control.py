@@ -212,7 +212,7 @@ def get_exams(text):
             "referat", "präsentation", "presentation"
         ],
         "Mündliche Prüfung": [
-            "mündlich", "oral", "prüfung"
+            "mündlich", "oral"
         ],
         "Klausur": [
             "schriftlich", "klausur", "exam", "e-klausur", "präsenz", "written"
