@@ -1,8 +1,8 @@
-courseInsightsTargetFile: /test/data.json
-courseScraper: module.test
-e3RatingsFile: /test/ratings.json
-e3TargetFile: /test/data.json
-ratingsEmail: test
-ratingsPassword: test
-ratingsScraper: module.test
-statusMessage: 2021-07-12 14:13
+courseInsightsTargetFile: /home/charlotte/Webdesign/ELAS-Backend/application/scraper/ci_clean.json
+courseScraper: /home/charlotte/Webdesign/uni-due-course-catalog-scraper/
+e3RatingsFile: /home/charlotte/Webdesign/ELAS-Frontend/src/components/Projects/E3Selector/data/avg_ratings.json
+e3TargetFile: /home/charlotte/Webdesign/ELAS-Frontend/src/components/Projects/E3Selector/data/e3_courses.json
+ratingsEmail: meinprof@charlotteharludo.com
+ratingsPassword: UJahePni&2%Dt^DT
+ratingsScraper: /home/charlotte/Webdesign/course-ratings/
+statusMessage: 2021-07-13 13:52

@@ -67,9 +67,7 @@ def scrape():
     e3_url = request.json["e3"]
     insight_url = request.json["insight"]
 
-    print(e3_url, insight_url)
-
-    # config["statusMessage"] = "running..."
+    config["statusMessage"] = "running..."
     with open(os.path.join(os.path.dirname(__file__), "scraper", "config.yaml"), "w") as file:
         file.write(yaml.dump(config))
 

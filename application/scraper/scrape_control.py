@@ -1,44 +1,54 @@
 import os
 import re
+import math
 import yaml
 import json
+import pprint
 import subprocess
 from datetime import datetime
 from difflib import SequenceMatcher
 
+pp = pprint.PrettyPrinter(indent=4)
+
 
 def run(config, insight_url, e3_url):
-    # 1. run all three scrapers: course-catalog for e3 and courseInsights, and course-ratings
+    # 0. define temp files
     temp_catalog = os.path.abspath(os.path.join(os.path.dirname(__file__), "temp_catalog.json"))
     temp_e3 = os.path.abspath(os.path.join(os.path.dirname(__file__), "temp_e3.json"))
+    temp_ratings_raw = os.path.abspath(os.path.join(os.path.dirname(__file__), "temp_ratings_raw.json"))
     temp_ratings = os.path.abspath(os.path.join(os.path.dirname(__file__), "temp_ratings.json"))
 
+    # 1. run all three scrapers: course-catalog for e3 and courseInsights, and course-ratings
     os.chdir(config["courseScraper"])
-    subprocess.call(f"scrapy crawl course-catalog -a url='{insight_url}' -o {temp_catalog}")
-    subprocess.call(f"scrapy crawl course-catalog -a url='{e3_url}' -a e3=True -o {temp_e3}")
+    subprocess.call(f"scrapy crawl course-catalog -a url='{insight_url}' -o {temp_catalog}", shell=True)
+    subprocess.call(f"scrapy crawl course-catalog -a url='{e3_url}' -a e3=True -o {temp_e3}", shell=True)
 
     os.chdir(config["ratingsScraper"])
-    subprocess.call(f"scrapy crawl -a email=\"{config['ratingsEmail']}\" -a password=\"{config['ratingsPassword']}\" course-ratings -o {temp_ratings}")
+    subprocess.call(f"scrapy crawl -a email=\"{config['ratingsEmail']}\" -a password=\"{config['ratingsPassword']}\" course-ratings -o {temp_ratings_raw}", shell=True)
 
-    # 2. post-process and save the insight data
+    # 2a. post-process and save the insight data
     os.chdir(os.path.join(config["courseScraper"], "course_catalog", "post_processing"))
-    subprocess.call(f"python process_data.py {temp_catalog} {config['courseInsightsTargetFile']}")
+    subprocess.call(f"python process_data.py {temp_catalog} {config['courseInsightsTargetFile']}", shell=True)
+
+    # 2b. post-process and save the ratings data
+    os.chdir(os.path.join(config["ratingsScraper"], "course_ratings", "post_processing"))
+    subprocess.call(f"python derive_attributes.py {temp_ratings_raw} {temp_ratings}", shell=True)
 
     # 3. load the data from the temp files
-    with open(temp_e3) as file:
+    with open(temp_e3, encoding='utf-8') as file:
         e3_courses = json.load(file)
 
-    with open(temp_ratings) as file:
+    with open(temp_ratings, encoding='utf-8') as file:
         ratings = json.load(file)
 
     # 4. process e3 data & ratings, write to target files
     e3_processed, avg_ratings = process_e3(e3_courses, ratings)
 
     with open(config["e3TargetFile"], "w") as file:
-        file.write(json.dump(e3_processed))
+        file.write(json.dumps(e3_processed))
 
     with open(config["e3RatingsFile"], "w") as file:
-        file.write(json.dump(avg_ratings))
+        file.write(json.dumps(avg_ratings))
 
     # 5. remove temp files
     os.remove(temp_catalog)
@@ -74,10 +84,10 @@ def process_e3(courses, ratings):
             "Link": course["url"],
             "catalog": course["parent_id"],
             "Type": course["subject_type"],
-            "SWS": course["sws"],
+            "SWS": course["sws"] if course["sws"] != " " else "",
             "Erwartete Teilnehmer": course["expected"],
             "Max. Teilnehmer": course["max"],
-            "Credits": course["credits"],
+            "Credits": clean_credits(course["credits"]),
             "Language": course["language"],
             "Description": clean_description(course["description"]),
             "Times_manual": convert_timetable(course["timetable"]),
@@ -87,20 +97,32 @@ def process_e3(courses, ratings):
         }
 
         # integrate the ratings, if they exist
-        course_ratings = find_ratings(ratings, course["Title"])
+        course_ratings = find_ratings(ratings, course["name"])
         if course_ratings:
             # update the ratings tracker
             ratings_count += 1
-            for key, item in avg_ratings.iter():
+            for key, item in avg_ratings.items():
                 avg_ratings[key] += course_ratings[key]
 
             processed_course = processed_course | course_ratings
 
+        else:
+            processed_course = processed_course | {
+                "fairness": "",
+                "support": "",
+                "material": "",
+                "fun": "",
+                "comprehensibility": "",
+                "interesting": "",
+                "grade_effort": ""
+            }
+
         # append the processed course to the list
         processed_courses.append(processed_course)
+        pp.pprint(processed_course)
 
     # calculate the average rating
-    for key, item in avg_ratings.iter():
+    for key, item in avg_ratings.items():
         avg_ratings[key] = item / ratings_count
 
     return processed_courses, avg_ratings
@@ -109,17 +131,31 @@ def process_e3(courses, ratings):
 def find_ratings(ratings, title):
     for rating in ratings:
         similarity = SequenceMatcher(None, title, rating["name"]).ratio()
-        if similarity > 0.75:
+        if similarity > 0.65:
             return {
-                "fairness": rating["fairness"] / 100,
-                "support": rating["support"] / 100,
-                "material": rating["material"] / 100,
-                "fun": rating["fun"] / 100,
-                "comprehensibility": rating["understandability"] / 100,
-                "interesting": rating["interest"] / 100,
-                "grade_effort": rating["node_effort"] / 100
+                "fairness": rating["fairness"] / 100 if rating["fairness"] else 0,
+                "support": rating["support"] / 100 if rating["support"] else 0,
+                "material": rating["material"] / 100 if rating["material"] else 0,
+                "fun": rating["fun"] / 100 if rating["fun"] else 0,
+                "comprehensibility": rating["understandability"] / 100 if rating["understandability"] else 0,
+                "interesting": rating["interest"] / 100 if rating["interest"] else 0,
+                "grade_effort": rating["node_effort"] / 100 if rating["node_effort"] else 0
             }
     return None
+
+
+def clean_credits(credits):
+    if len(credits) < 1:
+        return "0"
+
+    partials = credits.split("-")
+    if len(partials) == 1:
+        return partials[0]
+
+    if int(partials[0]) == int(partials[1]):
+        return str(partials[0])
+
+    return credits
 
 
 def clean_description(text):
@@ -128,10 +164,16 @@ def clean_description(text):
 
 
 def convert_timetable(timetable):
-    flattime = ""
+    flattime = set()
     for dates in timetable:
-        flattime += dates["day"][:-1] + dates["time"]["from"][:-3] + "-" + dates["time"]["to"][:-3] + ";"
-    return flattime
+        try:
+            dates["day"] = dates["day"].replace(u'\xa0', ' ').strip()
+            dates["time"] = dates["time"].replace(u'\xa0', ' ').strip()
+            start = math.floor(int(dates["time"][:2])/2.)*2
+            flattime.add(dates["day"][:2] + str(start) + "-" + str(start + 2))
+        except ValueError:
+            continue
+    return ";".join(flattime)
 
 
 def get_locations(timetable):
@@ -144,12 +186,14 @@ def get_locations(timetable):
             locations.add("Dortmund")
         elif "online" in loc:
             locations.add("online")
-        elif any("Ruhr", "Bochum", "HNC", "RUB") in loc:
+        elif any(word in loc for word in ["Ruhr", "Bochum", "HNC", "RUB"]):
             locations.add("Bochum")
-        elif "Essen" in loc or loc.startswith("E ") or loc.split(": ")[1].startswith("E "):
+        elif "Essen" in loc or loc.startswith("E ") or (len(loc.split(": ")) > 1 and loc.split(": ")[1].startswith("E ")):
             locations.add("Essen")
-        elif "Duisburg" in loc or loc.startswith("D ") or loc.split(": ")[1].startswith("D "):
+        elif "Duisburg" in loc or loc.startswith("D ") or (len(loc.split(": ")) > 1 and loc.split(": ")[1].startswith("D ")):
             locations.add("Duisburg")
+        elif "E-Learning" in date["elearn"]:
+            locations.add("online")
 
     if not len(locations):
         return "unknown"
@@ -183,7 +227,7 @@ def get_exams(text):
 
     text = text.lower()
 
-    for key, item in markers.iter():
+    for key, item in markers.items():
         for marker in item:
             weight[key] += text.count(marker)
 
@@ -208,21 +252,31 @@ def get_excluded(text):
     }
 
     overrides = {
-        " IngWi": "ALLE",
+        "IngWi": "ALLE",
         "Alle außer BauIng (1. FS)": "ALLE (außer Bauingenieurwesen (1. FS))",
         "IngWi (außer BauIng)": "ALLE (außer Bauingenieurwesen)"
     }
 
+    text = re.sub(r"\(IngWi\)", "IngBRACESWi", text)
+    text = re.sub(r"\(IngWi & WiWi\)", "IngBRACESWiWi", text)
     text = re.sub(r"[^0-9a-zA-Z,.-]+", " ", text)
 
-    for key, item in overrides.iter():
+    for key, item in overrides.items():
         if key in text:
             return item
 
     excluded = []
 
-    for key, item in shorthand.iter():
+    for key, item in shorthand.items():
         if key in text:
             excluded.append(item)
 
     return ";".join(excluded) if len(excluded) else "-"
+
+
+if __name__ == "__main__":
+    with open("config.yaml", "r") as file:
+        config = file.read()
+    config = yaml.safe_load(config)
+
+    run(config, "", "https://campus.uni-due.de/lsf/rds?state=wtree&search=1&trex=step&root120211=280741%7C276221%7C276682&P.vx=kurz")
