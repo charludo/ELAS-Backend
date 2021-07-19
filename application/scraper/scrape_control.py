@@ -161,7 +161,7 @@ def clean_credits(credits):
         if int(partials[0]) == int(partials[1]):
             return str(partials[0])
     except Exception:
-        pass
+        return "0"
 
     return credits
 
