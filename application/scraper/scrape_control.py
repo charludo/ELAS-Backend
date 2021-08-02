@@ -82,7 +82,7 @@ def process_e3(courses, ratings):
         if course["url"] in [c["Link"] for c in processed_courses]:
             continue
 
-        # Rename the dict keys
+        # Rename the dict keys and populate with processed data
         processed_course = {
             "selected": False,
             "Title": course["name"],
@@ -135,6 +135,7 @@ def process_e3(courses, ratings):
 
 def find_ratings(ratings, title):
     for rating in ratings:
+        # courses are not named the same on meinprof.de as in the LSF
         similarity = SequenceMatcher(None, title, rating["name"]).ratio()
         if similarity > 0.65:
             return {
@@ -287,4 +288,4 @@ if __name__ == "__main__":
         config = file.read()
     config = yaml.safe_load(config)
 
-    run(config, "", "https://campus.uni-due.de/lsf/rds?state=wtree&search=1&trex=step&root120211=280741%7C276221%7C276682&P.vx=kurz")
+    run(config, "https://campus.uni-due.de/lsf/rds?state=wtree&search=1&trex=step&root120211=280741%7C276367&P.vx=kurz", "https://campus.uni-due.de/lsf/rds?state=wtree&search=1&trex=step&root120211=280741%7C276221%7C276682&P.vx=kurz")

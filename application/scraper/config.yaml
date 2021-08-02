@@ -1,8 +1,8 @@
-courseInsightsTargetFile: /home/charlotte/ci_clean.json
-courseScraper: /home/charlotte/Webdesign/uni-due-course-catalog-scraper/
-e3RatingsFile: /home/charlotte/avg_ratings.json
-e3TargetFile: /home/charlotte/e3_courses.json
-ratingsEmail: meinprof@charlotteharludo.com
-ratingsPassword: UJahePni&2%Dt^DT
-ratingsScraper: /home/charlotte/Webdesign/course-ratings/
-statusMessage: 2021-07-13 14:36
+courseInsightsTargetFile: /home/.../ci_clean.json
+courseScraper: /home/.../uni-due-course-catalog-scraper/
+e3RatingsFile: /home/.../avg_ratings.json
+e3TargetFile: /home/.../e3_courses.json
+ratingsEmail: YOUR EMAIL
+ratingsPassword: YOUR PASSWORD
+ratingsScraper: /home/.../course-ratings/
+statusMessage: 2021-08-02 11:03
